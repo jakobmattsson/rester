@@ -1,0 +1,18 @@
+{
+  "name": "rester",
+  "description": "Building RESTful services dead simple",
+  "version": "0.0.1",
+  "main": "app.js",
+  "author": "Jakob Mattsson <jakob.mattsson@gmail.com> (jakobmattsson.se)",
+  "engines": {
+    "node": "*"
+  },
+  "dependencies": {
+    "async": "0.1.16",
+    "express": "2.5.8",
+    "underscore": "1.3.1"
+  },
+  "devDependencies": {
+
+  }
+}
