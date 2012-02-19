@@ -37,15 +37,14 @@ var rester = block(function() {
           }
         });
 
-        def('delete', prepath + '/:' + itemName, function(params, data, callback) {
+        def('delete', prepath + '/:' + itemName, itemsArray, function(params, data, callback) {
           var items = itemsArray;
-          var ps = items.map(function(name) { return params[name]; });
-          dbdriver.deleteItem(items, ps, function(err, result) {
+          dbdriver.deleteItem(items, params, function(err, result) {
             // hanterar error här
             callback(null, result);
           });
         });
-        def('put', prepath + '/:' + itemName, function(params, data, callback) {
+        def('put', prepath + '/:' + itemName, itemsArray, function(params, data, callback) {
 
           var newobj = { };
           var fails = [];
@@ -63,35 +62,30 @@ var rester = block(function() {
           if (fails.length > 0) {
             callback(fails.join('\n'));
           } else {
-            var ps = itemsArray.map(function(name) { return params[name]; });
-            
-            dbdriver.updateItem(itemsArray, ps, newobj, function(err, newItem) {
+            dbdriver.updateItem(itemsArray, params, newobj, function(err, newItem) {
               // hantera error här
               callback(null, newItem);
             });
           }
         });
-        def('get', prepath + '/:' + itemName, function(params, data, callback) {
+        def('get', prepath + '/:' + itemName, itemsArray, function(params, data, callback) {
           var items = itemsArray;
-          var ps = items.map(function(name) { return params[name]; });
 
-          dbdriver.retrieveSingle(items, ps, function(err, data) {
+          dbdriver.retrieveSingle(items, params, function(err, data) {
 
             // hanterar error här
             callback(null, data);
           });
         });
-        def('get', prepath, function(params, data, callback) {
+        def('get', prepath, itemsArray, function(params, data, callback) {
           var items = itemsArray;
-          var ps = items.map(function(name) { return params[name]; });
-
-          dbdriver.retrieve(items, ps, function(err, data) {
+          dbdriver.retrieve(items, params, function(err, data) {
             
             // hantera error här
             callback(null, data);
           });
         });
-        def('post', prepath, function(params, data, callback) {
+        def('post', prepath, itemsArray, function(params, data, callback) {
 
           var newobj = { };
 
@@ -109,9 +103,7 @@ var rester = block(function() {
           });
 
           var items = itemsArray;
-          var ps = items.map(function(name) { return params[name]; });
-
-          dbdriver.save(items, ps, newobj, function(err) {
+          dbdriver.save(items, params, newobj, function(err) {
             // hantera error här
             delete newobj.apa;
             
@@ -120,9 +112,9 @@ var rester = block(function() {
         });
       };
 
-      var def = function(method, path, callback) {
+      var def = function(method, path, items, callback) {
         app[method](path, function(req, res) {
-          callback(req.params, req.body, function(err, data) {
+          callback(items.map(function(name) { return req.params[name]; }), req.body, function(err, data) {
             if (err) {
               res.send(JSON.stringify(err), { 'Content-Type': 'application/json' }, 400);
             } else {
@@ -136,13 +128,13 @@ var rester = block(function() {
         rec('/' + key, key, spec[key], [key]);
       });
 
-      def('get', '/', function(params, data, callback) {
+      def('get', '/', [], function(params, data, callback) {
         dbdriver.serialize(function(err, db) {
           callback(err, db);
         });
       });
 
-      def('delete', '/', function(params, data, callback) {
+      def('delete', '/', [], function(params, data, callback) {
         dbdriver.clobber(spec, callback);
       });
 
