@@ -11,7 +11,7 @@ rester.service({
       name: 'string',
       admin: 'bool',
       moods: {
-        feeling: 'int'
+        feeling: 'number'
       }
     }
   },

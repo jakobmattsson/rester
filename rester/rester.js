@@ -17,29 +17,11 @@ var inString = function(x) {
 
 
 var rester = block(function() {
-
   return {
     service: function(spec, port, dbdriver) {
 
       var app = express.createServer();
       app.use(express.bodyParser());
-
-
-
-
-
-
-
-      var nextID;
-
-      var generateID = block(function() {
-        return function() {
-          nextID += 52;
-          return nextID;
-        };
-      });
-
-
 
       var rec = function(prepath, itemName, spec, itemsArray) {
 
@@ -51,20 +33,19 @@ var rester = block(function() {
             properties[key] = spec[key];
           } else {
             subobjects.push(key);
-            rec(prepath + itemName + '/:' + itemName + '_id/', key, spec[key], itemsArray.concat([itemName]));
+            rec(prepath + '/:' + itemName + '/' + key, key, spec[key], itemsArray.concat(key));
           }
         });
 
-        def('delete', prepath + itemName + '/:' + itemName + '_id', function(params, data, callback) {
-          var items = itemsArray.concat([itemName]);
-          var ps = items.map(function(name) { return params[name + '_id']; });
+        def('delete', prepath + '/:' + itemName, function(params, data, callback) {
+          var items = itemsArray;
+          var ps = items.map(function(name) { return params[name]; });
           dbdriver.deleteItem(items, ps, function(err, result) {
             // hanterar error här
             callback(null, result);
           });
         });
-
-        def('put', prepath + itemName + '/:' + itemName + '_id', function(params, data, callback) {
+        def('put', prepath + '/:' + itemName, function(params, data, callback) {
 
           var newobj = { };
           var fails = [];
@@ -82,18 +63,17 @@ var rester = block(function() {
           if (fails.length > 0) {
             callback(fails.join('\n'));
           } else {
-            var items = itemsArray.concat([itemName]);
-            var ps = items.map(function(name) { return params[name + '_id']; });
+            var ps = itemsArray.map(function(name) { return params[name]; });
             
-            dbdriver.updateItem(items, ps, newobj, function(err, newItem) {
+            dbdriver.updateItem(itemsArray, ps, newobj, function(err, newItem) {
               // hantera error här
               callback(null, newItem);
             });
           }
         });
-        def('get', prepath + itemName + '/:' + itemName + '_id', function(params, data, callback) {
-          var items = itemsArray.concat([itemName]);
-          var ps = items.map(function(name) { return params[name + '_id']; });
+        def('get', prepath + '/:' + itemName, function(params, data, callback) {
+          var items = itemsArray;
+          var ps = items.map(function(name) { return params[name]; });
 
           dbdriver.retrieveSingle(items, ps, function(err, data) {
 
@@ -101,9 +81,9 @@ var rester = block(function() {
             callback(null, data);
           });
         });
-        def('get', prepath + itemName, function(params, data, callback) {
-          var items = itemsArray.concat([itemName]);
-          var ps = items.map(function(name) { return params[name + '_id']; });
+        def('get', prepath, function(params, data, callback) {
+          var items = itemsArray;
+          var ps = items.map(function(name) { return params[name]; });
 
           dbdriver.retrieve(items, ps, function(err, data) {
             
@@ -111,11 +91,9 @@ var rester = block(function() {
             callback(null, data);
           });
         });
-        def('post', prepath + itemName, function(params, data, callback) {
+        def('post', prepath, function(params, data, callback) {
 
-          var newobj = {
-            id: generateID()
-          };
+          var newobj = { };
 
           subobjects.forEach(function(subobject) {
             newobj[subobject] = {};
@@ -130,10 +108,10 @@ var rester = block(function() {
             }
           });
 
-          var items = itemsArray.concat([itemName]);
-          var ps = items.map(function(name) { return params[name + '_id']; });
+          var items = itemsArray;
+          var ps = items.map(function(name) { return params[name]; });
 
-          dbdriver.save(items, ps, newobj.id, newobj, function(err) {
+          dbdriver.save(items, ps, newobj, function(err) {
             // hantera error här
             delete newobj.apa;
             
@@ -142,10 +120,7 @@ var rester = block(function() {
         });
       };
 
-
-
       var def = function(method, path, callback) {
-        console.log("defining " + path + " (" + method + ")");
         app[method](path, function(req, res) {
           callback(req.params, req.body, function(err, data) {
             if (err) {
@@ -157,30 +132,23 @@ var rester = block(function() {
         });
       };
 
-
-
-      var init = function() {
-        nextID = 1;
-        dbdriver.clobber(spec);
-      };
-      init();
-
       Object.keys(spec).forEach(function(key) {
-        rec('/', key, spec[key], []);
+        rec('/' + key, key, spec[key], [key]);
       });
 
       def('get', '/', function(params, data, callback) {
         dbdriver.serialize(function(err, db) {
-          callback(null, db);
+          callback(err, db);
         });
       });
 
       def('delete', '/', function(params, data, callback) {
-        init();
-        callback(null);
+        dbdriver.clobber(spec, callback);
       });
 
-      app.listen(port);
+      dbdriver.clobber(spec, function() {
+        app.listen(port);
+      });
     },
     prop: function(x) {
       return x;
@@ -190,6 +158,14 @@ var rester = block(function() {
 
 var memdriver = block(function() {
   var db;
+  var nextID = 1;
+
+  var generateID = block(function() {
+    return function() {
+      nextID += 52;
+      return nextID;
+    };
+  });
 
   var helper = function(collections, ids) {
     var collectionHeads = collections.slice(0, -1);
@@ -215,15 +191,19 @@ var memdriver = block(function() {
   };
 
   return {
-    clobber: function(spec) {
+    clobber: function(spec, callback) {
       db = {};
+      nextID = 1;
       Object.keys(spec).forEach(function(key) {
         db[key] = {};
       });
+      callback(null);
     },
-    save: function(collections, ids, newid, newobj, callback) {
+    save: function(collections, ids, newobj, callback) {
+      var newid = generateID();
       var h = helper(collections, ids);
       h.element[h.collection][newid] = newobj;
+      h.element[h.collection][newid].id = newid;
       callback(null);
     },
     retrieve: function(collections, ids, callback) {
