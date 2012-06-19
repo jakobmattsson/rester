@@ -119,7 +119,7 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
 
     midFilter = (type) -> (req, res, next) ->
       authFuncs =
-        read: mods[modelName].auth || ->
+        read: mods[modelName].auth || -> {}
         write: mods[modelName].authWrite
         create: mods[modelName].authCreate
       authFuncs.write ?= authFuncs.read
