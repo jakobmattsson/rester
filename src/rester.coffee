@@ -8,7 +8,13 @@ exports.respond = (req, res, data, result) ->
     res.header 'Access-Control-Allow-Credentials', 'true'
     res.header 'Access-Control-Allow-Headers', 'Authorization'
     res.header 'Access-Control-Allow-Methods', 'POST, GET, OPTIONS, DELETE, PUT'
-  res.json data, (result || 200)
+
+  code = result || 200
+
+  if req.query.metabody
+    res.json { code: code, body: data, headers: 'Not implemented' }, 200
+  else
+    res.json data, code
 
 verbs = []
 
