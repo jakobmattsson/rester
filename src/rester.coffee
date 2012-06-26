@@ -36,11 +36,7 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
       errHandler = (f) ->
         (err, data) ->
           if err
-            if err.unauthorized
-              res.header 'WWW-Authenticate', 'Basic realm="sally"'
-              exports.respond req, res, { err: "unauthed" }, 401
-            else
-              exports.respond req, res, { err: err.toString() }, 400
+            exports.respond req, res, { err: err.toString() }, 400
             return
           f(data)
 
@@ -133,12 +129,13 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
         if !filter?
           res.header 'WWW-Authenticate', 'Basic realm="sally"'
           exports.respond req, res, { err: "unauthed" }, 401
+          return
+
+        req.queryFilter = joinFilters(filter, req.queryFilter)
+        if !req.queryFilter?
+          exports.respond req, res, { err: "No such id" }, 400
         else
-          req.queryFilter = joinFilters(filter, req.queryFilter)
-          if !req.queryFilter?
-            exports.respond req, res, { err: "No such id" }, 401
-          else
-            next()
+          next()
 
     def2 'get', "/#{modelName}", [midFilter('read')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
       db.list modelName, req.queryFilter, callback
