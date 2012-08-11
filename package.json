@@ -1,7 +1,7 @@
 {
   "name": "rester",
   "description": "Building RESTful services dead simple",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "main": "rester.js",
   "author": "Jakob Mattsson <jakob.mattsson@gmail.com> (jakobmattsson.se)",
   "engines": {
