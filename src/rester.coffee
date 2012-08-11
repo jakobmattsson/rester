@@ -1,6 +1,6 @@
 _ = require 'underscore'
 async = require 'async'
-underline = require 'underline'
+_.mixin require 'underscore.plus'
 
 exports.respond = (req, res, data, result) ->
   if req.headers.origin
@@ -173,9 +173,9 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
         # <natural-id>
         natId = mods[owner.plur].naturalId
         if natId?
-          obj = underline.makeObject(natId, req.params.id)
+          obj = _.makeObject(natId, req.params.id)
           db.getOne owner.plur, obj, (err, resObj) ->
-            filter2 = underline.makeObject(owner.sing, resObj.id)
+            filter2 = _.makeObject(owner.sing, resObj.id)
             filter = joinFilters(filter, filter2)
             if !filter?
               callback('No such id')
@@ -184,7 +184,7 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
           return
         # </natural-id>
 
-        filter = joinFilters(filter, underline.makeObject(outer, id))
+        filter = joinFilters(filter, _.makeObject(outer, id))
         if !filter?
           callback 'No such id'
           return
@@ -192,12 +192,12 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
         db.list modelName, filter, callback
 
       def2 'post', "/#{owner.plur}/:id/#{modelName}", [midFilter('create')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
-        data = _.extend({}, req.body, underline.makeObject(owner.sing, req.params.id))
+        data = _.extend({}, req.body, _.makeObject(owner.sing, req.params.id))
 
         # <natural-id>
         natId = mods[owner.plur].naturalId
         if natId?
-          obj = underline.makeObject(natId, req.params.id)
+          obj = _.makeObject(natId, req.params.id)
           db.getOne owner.plur, obj, (err, resObj) ->
             if err
               callback(err)
