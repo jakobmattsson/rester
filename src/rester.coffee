@@ -191,6 +191,32 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
 
         db.list modelName, filter, callback
 
+
+      def2 'post', "/#{modelName}", [midFilter('create')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
+        data = _.extend({}, req.body, _.makeObject(owner.sing, req.params.id))
+
+        # This doesn't seem to work with natural IDs.
+        #
+        # <natural-id>
+        # natId = mods[owner.plur].naturalId
+        # if natId?
+        #   obj = _.makeObject(natId, req.params.id)
+        #   db.getOne owner.plur, obj, (err, resObj) ->
+        #     if err
+        #       callback(err)
+        #       return
+        #
+        #     data[owner.sing] = resObj.id
+        #     db.post modelName, data, callback
+        #   return
+        # </natural-id>
+
+        if req.queryFilter[owner.sing]?
+          data[owner.sing] = req.queryFilter[owner.sing]
+          db.post modelName, data, callback
+        else
+          callback('Missing owner')
+
       def2 'post', "/#{owner.plur}/:id/#{modelName}", [midFilter('create')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
         data = _.extend({}, req.body, _.makeObject(owner.sing, req.params.id))
 
