@@ -72,7 +72,7 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
     filter1 ?= {}
     filter2 ?= {}
     dupKeys = _.intersection(Object.keys(filter1), Object.keys(filter2))
-    return undefined if dupKeys.some (name) -> filter1[name].toString() != filter2[name].toString()
+    return undefined if dupKeys.some (name) -> filter1[name]?.toString() != filter2[name]?.toString()
     _.extend({}, filter1, filter2)
 
   fieldFilterMiddleware = (fieldFilter) -> (req, outdata, callback) ->
