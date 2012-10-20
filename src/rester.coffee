@@ -116,8 +116,8 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
 
   db.getModels().forEach (modelName) ->
 
-    owners = db.getOwners(modelName)
-    manyToMany = db.getManyToMany(modelName)
+    owners = db.getMeta(modelName).owners
+    manyToMany = db.getMeta(modelName).manyToMany
 
     midFilter = (type) -> (req, res, next) ->
       authFuncs =
@@ -157,8 +157,8 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
 
     def2 'get', "/meta/#{modelName}", [], [], (req, callback) ->
       callback null,
-        owns: db.getOwnedModels(modelName).map((x) -> x.name)
-        fields: db.getMetaFields(modelName)
+        owns: db.getMeta(modelName).owns.map((x) -> x.name)
+        fields: db.getMeta(modelName).fields
 
     if owners.length == 0
       def2 'post', "/#{modelName}", [midFilter('create')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
@@ -261,7 +261,7 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
 
   def2 'get', '/', [], [], (req, callback) ->
     callback null,
-      roots: db.getModels().filter((name) -> db.getOwners(name).length == 0)
+      roots: db.getModels().filter((name) -> db.getMeta(name).owners.length == 0)
       verbs: verbs
 
   def2 'options', '*', [], [], (req, callback) ->
