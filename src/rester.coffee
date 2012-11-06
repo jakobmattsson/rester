@@ -2,12 +2,13 @@ _ = require 'underscore'
 async = require 'async'
 _.mixin require 'underscore.plus'
 
-exports.respond = (req, res, data, result) ->
+exports.respond = (tempCorsFunc, req, res, data, result) ->
   if req.headers.origin
     res.header 'Access-Control-Allow-Origin', req.headers.origin
     res.header 'Access-Control-Allow-Credentials', 'true'
     res.header 'Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || 'Authorization' # Maybe these: 'origin, authorization, accept' or req.headers['access-control-allow-headers']
     res.header 'Access-Control-Allow-Methods', 'POST, GET, OPTIONS, DELETE, PUT'
+    tempCorsFunc(res, req)
 
   code = result || 200
 
@@ -22,7 +23,7 @@ exports.verb = (app, route, middleware, callback) ->
   app.post '/' + route, middleware, callback
   verbs.push route
 
-exports.exec = (app, db, getUserFromDbCore, mods) ->
+exports.exec = (app, db, getUserFromDbCore, mods, tempCorsFunc) ->
 
   getUserFromDb = (req, callback) ->
     if req._hasCachedUser
@@ -42,7 +43,7 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
       errHandler = (f) ->
         (err, data) ->
           if err
-            exports.respond req, res, { err: err.toString() }, 400
+            exports.respond tempCorsFunc, req, res, { err: err.toString() }, 400
             return
           f(data)
 
@@ -52,11 +53,11 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
           async.reduce postMid, data, (memo, mid, callback) ->
             mid(req, data, callback)
           , errHandler (result) ->
-            exports.respond req, res, result
+            exports.respond tempCorsFunc, req, res, result
       catch ex
         console.log(ex.message)
         console.log(ex.stack)
-        exports.respond req, res, { err: 'Internal error: ' + ex.toString() }, 500
+        exports.respond tempCorsFunc, req, res, { err: 'Internal error: ' + ex.toString() }, 500
 
   naturalizeIn = (field) -> (req, res, next) ->
     if !field?
@@ -134,12 +135,12 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
         filter = authFuncs[type](user)
         if !filter?
           res.header 'WWW-Authenticate', 'Basic realm="sally"'
-          exports.respond req, res, { err: "unauthed" }, 401
+          exports.respond tempCorsFunc, req, res, { err: "unauthed" }, 401
           return
 
         req.queryFilter = joinFilters(filter, req.queryFilter)
         if !req.queryFilter?
-          exports.respond req, res, { err: "No such id" }, 400
+          exports.respond tempCorsFunc, req, res, { err: "No such id" }, 400
         else
           next()
 
