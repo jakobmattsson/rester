@@ -3,12 +3,6 @@ async = require 'async'
 _.mixin require 'underscore.plus'
 
 exports.respond = (req, res, data, result) ->
-  if req.headers.origin
-    res.header 'Access-Control-Allow-Origin', '*'
-    res.header 'Access-Control-Allow-Credentials', 'true'
-    res.header 'Access-Control-Allow-Headers', req.headers['access-control-request-headers']
-    res.header 'Access-Control-Allow-Methods', 'POST, GET, OPTIONS, DELETE, PUT'
-
   code = result || 200
 
   if req.query.metabody
