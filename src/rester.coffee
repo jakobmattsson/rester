@@ -4,10 +4,10 @@ _.mixin require 'underscore.plus'
 
 exports.respond = (tempCorsFunc, req, res, data, result) ->
   if req.headers.origin
-    res.header 'Access-Control-Allow-Origin', req.headers.origin
-    res.header 'Access-Control-Allow-Credentials', 'true'
-    res.header 'Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || 'Authorization' # Maybe these: 'origin, authorization, accept' or req.headers['access-control-allow-headers']
-    res.header 'Access-Control-Allow-Methods', 'POST, GET, OPTIONS, DELETE, PUT'
+    # res.header 'Access-Control-Allow-Origin', req.headers.origin
+    # res.header 'Access-Control-Allow-Credentials', 'true'
+    # res.header 'Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || 'Authorization' # Maybe these: 'origin, authorization, accept' or req.headers['access-control-allow-headers']
+    # res.header 'Access-Control-Allow-Methods', 'POST, GET, OPTIONS, DELETE, PUT'
     tempCorsFunc(res, req)
 
   code = result || 200
