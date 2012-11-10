@@ -2,18 +2,26 @@
   "name": "rester",
   "description": "Building RESTful services dead simple",
   "version": "0.5.1",
-  "main": "rester.js",
+  "main": "./lib/rester.js",
   "author": "Jakob Mattsson <jakob.mattsson@gmail.com> (jakobmattsson.se)",
   "engines": {
-    "node": "*"
+    "npm": "1.1.x",
+    "node": "0.8.x"
+  },
+  "scripts": {
+    "pretest": "coffee -c -o lib src",
+    "prepublish": "coffee -c -o lib src",
+    "prestart": "coffee -c -o lib src",
+    "test": "mocha -r should --compilers coffee:coffee-script spec/*.coffee",
+    "coverage": "sh scripts/coverage.sh spec/mocha.js all.html"
   },
   "dependencies": {
-    "coffee-script": "1.4.0",
     "async": "0.1.22",
     "underscore.plus": "0.2.1",
     "underscore": "1.4.2"
   },
   "devDependencies": {
-
+    "should": "1.1.0",
+    "coffee-script": "1.4.0"
   }
 }
