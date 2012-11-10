@@ -1,6 +1,5 @@
 _ = require 'underscore'
 async = require 'async'
-_.mixin require 'underscore.plus'
 
 exports.respond = (req, res, data, result) ->
   code = result || 200
@@ -16,7 +15,12 @@ exports.verb = (app, route, middleware, callback) ->
   app.post '/' + route, middleware, callback
   verbs.push route
 
-exports.exec = (app, db, getUserFromDbCore, mods) ->
+exports.exec = (app, db, getUserFromDbCore, config = {}) ->
+  config.authRealm ?= 'rester'
+  config.verbose ?= true
+
+
+  mods = db.getModels()
 
   getUserFromDb = (req, callback) ->
     if req._hasCachedUser
@@ -41,7 +45,7 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
           f(data)
 
       try
-        console.log(req.method, req.url)
+        console.log(req.method, req.url) if config.verbose
         callback req, errHandler (data) ->
           async.reduce postMid, data, (memo, mid, callback) ->
             mid(req, data, callback)
@@ -108,7 +112,7 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
 
     callback null, data
 
-  db.getModels().forEach (modelName) ->
+  Object.keys(mods).forEach (modelName) ->
 
     owners = db.getMeta(modelName).owners
     manyToMany = db.getMeta(modelName).manyToMany
@@ -127,7 +131,7 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
           return
         filter = authFuncs[type](user)
         if !filter?
-          res.header 'WWW-Authenticate', 'Basic realm="sally"'
+          res.header 'WWW-Authenticate', 'Basic realm="' + config.authRealm + '"'
           exports.respond req, res, { err: "unauthed" }, 401
           return
 
@@ -141,7 +145,7 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
       db.list modelName, req.queryFilter, callback
 
     def2 'get', "/#{modelName}/:id", [naturalizeIn(mods[modelName].naturalId), midFilter('read')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
-      db.getOne modelName, req.queryFilter, callback
+      db.getOne modelName, { filter: req.queryFilter }, callback
 
     def2 'del', "/#{modelName}/:id", [naturalizeIn(mods[modelName].naturalId), midFilter('write')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
       db.delOne modelName, req.queryFilter, callback
@@ -167,9 +171,9 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
         # <natural-id>
         natId = mods[owner.plur].naturalId
         if natId?
-          obj = _.makeObject(natId, req.params.id)
+          obj = _.object([[natId, req.params.id]])
           db.getOne owner.plur, obj, (err, resObj) ->
-            filter2 = _.makeObject(owner.sing, resObj.id)
+            filter2 = _.object([[owner.sing, resObj.id]])
             filter = joinFilters(filter, filter2)
             if !filter?
               callback('No such id')
@@ -178,7 +182,7 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
           return
         # </natural-id>
 
-        filter = joinFilters(filter, _.makeObject(outer, id))
+        filter = joinFilters(filter, _.object([[outer, id]]))
         if !filter?
           callback 'No such id'
           return
@@ -187,14 +191,14 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
 
 
       def2 'post', "/#{modelName}", [midFilter('create')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
-        data = _.extend({}, req.body, _.makeObject(owner.sing, req.params.id))
+        data = req.body
 
         # This doesn't seem to work with natural IDs.
         #
         # <natural-id>
         # natId = mods[owner.plur].naturalId
         # if natId?
-        #   obj = _.makeObject(natId, req.params.id)
+        #   obj = _.object([[natId, req.params.id]])
         #   db.getOne owner.plur, obj, (err, resObj) ->
         #     if err
         #       callback(err)
@@ -207,17 +211,18 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
 
         if req.queryFilter[owner.sing]?
           data[owner.sing] = req.queryFilter[owner.sing]
-          db.post modelName, data, callback
-        else
-          callback('Missing owner')
+        else if !data[owner.sing]?
+          return callback('Missing owner')
+
+        db.post modelName, data, callback
 
       def2 'post', "/#{owner.plur}/:id/#{modelName}", [midFilter('create')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
-        data = _.extend({}, req.body, _.makeObject(owner.sing, req.params.id))
+        data = _.extend({}, req.body, _.object([[owner.sing, req.params.id]]))
 
         # <natural-id>
         natId = mods[owner.plur].naturalId
         if natId?
-          obj = _.makeObject(natId, req.params.id)
+          obj = _.object([[natId, req.params.id]])
           db.getOne owner.plur, obj, (err, resObj) ->
             if err
               callback(err)
@@ -232,34 +237,23 @@ exports.exec = (app, db, getUserFromDbCore, mods) ->
 
     manyToMany.forEach (many) ->
       def2 'post', "/#{modelName}/:id/#{many.name}/:other", [], [], (req, callback) ->
-        db.postMany modelName, req.params.id, many.name, many.ref, req.params.other, callback
-
-      def2 'post', "/#{many.name}/:other/#{modelName}/:id", [], [], (req, callback) ->
-        db.postMany modelName, req.params.id, many.name, many.ref, req.params.other, callback
+        db.postMany modelName, req.params.id, many.name, req.params.other, callback
 
       def2 'get', "/#{modelName}/:id/#{many.name}", [], [], (req, callback) ->
         db.getMany modelName, req.params.id, many.name, callback
 
-      def2 'get', "/#{many.name}/:id/#{modelName}", [], [], (req, callback) ->
-        db.getManyBackwards modelName, req.params.id, many.name, callback
-
       def2 'del', "/#{modelName}/:id/#{many.name}/:other", [], [], (req, callback) ->
         db.getOne many.ref, { id: req.params.other }, (err, data) ->
-          db.delMany modelName, req.params.id, many.name, many.ref, req.params.other, (innerErr) ->
-            callback(err || innerErr, data)
-
-      def2 'del', "/#{many.name}/:other/#{modelName}/:id", [], [], (req, callback) ->
-        db.getOne modelName, { id: req.params.id }, (err, data) ->
-          db.delMany modelName, req.params.id, many.name, many.ref, req.params.other, (innerErr) ->
+          db.delMany modelName, req.params.id, many.name, req.params.other, (innerErr) ->
             callback(err || innerErr, data)
 
   def2 'get', '/', [], [], (req, callback) ->
     callback null,
-      roots: db.getModels().filter((name) -> db.getMeta(name).owners.length == 0)
+      roots: Object.keys(mods).filter((name) -> db.getMeta(name).owners.length == 0)
       verbs: verbs
 
-  def2 'options', '*', [], [], (req, callback) ->
-    callback null, {}
-
+  # def2 'options', '*', [], [], (req, callback) ->
+  #   callback null, {}
+  # 
   def2 'all', '*', [], [], (req, callback) ->
     callback 'No such resource'
