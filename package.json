@@ -9,17 +9,21 @@
     "node": "0.8.x"
   },
   "scripts": {
-    "pretest": "coffee -c -o lib src",
-    "prepublish": "coffee -c -o lib src",
-    "prestart": "coffee -c -o lib src",
-    "test": "mocha -r should --compilers coffee:coffee-script spec/*.coffee",
-    "coverage": "sh scripts/coverage.sh spec/mocha.js all.html"
+    "pretest": "coffee -co lib src",
+    "prepublish": "coffee -co lib src",
+    "prestart": "coffee -co lib src",
+    "test": "mocha --compilers coffee:coffee-script spec/*.coffee",
+    "coverage": "jscov src .cov && JSCOV=.cov mocha --compilers coffee:coffee-script --reporter mocha-term-cov-reporter spec/*.coffee"
   },
   "dependencies": {
     "async": "0.1.22",
     "underscore": "1.4.2"
   },
   "devDependencies": {
+    "jscov": "0.4.1",
+    "mocha-term-cov-reporter": "0.1.0",
+    "mocha": "1.8.1",
+    "mongojs": "0.6.2",
     "express": "3.0.1",
     "q": "0.8.10",
     "request": "2.12.0",

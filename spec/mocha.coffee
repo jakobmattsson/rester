@@ -1,4 +1,5 @@
-rester = require('./setup').requireSource('rester')
+jscov = require 'jscov'
+rester = require jscov.cover('..', 'lib', 'rester')
 should = require 'should'
 express = require 'express'
 manikin = require 'manikin-mongodb'
