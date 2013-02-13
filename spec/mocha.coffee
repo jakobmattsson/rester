@@ -64,7 +64,7 @@ it "should do things", (done) ->
 
   # define the db
   db = manikin.create()
-  db.defModels
+  models =
     people:
       fields:
         name: 'string'
@@ -81,9 +81,9 @@ it "should do things", (done) ->
 
   # run tests
   mongojs.connect(mongodb).dropDatabase ->
-    db.connect mongodb, ->
+    db.connect mongodb, models, ->
 
-      rester.exec(app, db, userFromDb, { verbose: false })
+      rester.exec(app, db, models, userFromDb, { verbose: false })
       app.listen(port)
 
       s = {}
@@ -177,11 +177,11 @@ it "should do things", (done) ->
       .then ->
         req { url: "/foods/#{s.food1.id}/eatenBy/#{s.sixten.id}", method: 'POST' }
       .then ({ json }) ->
-        json.should.eql {} # Getting an empty object back is suboptimal. Should be fixed in future version.
+        json.should.eql { status: 'inserted' }
       .then ->
         req { url: "/foods/#{s.food0.id}/eatenBy/#{s.sixten.id}", method: 'POST' }
       .then ({ json }) ->
-        json.should.eql {} # Getting an empty object back is suboptimal. Should be fixed in future version.
+        json.should.eql { status: 'inserted' }
       .then ->
         req "/pets/#{s.sixten.id}"
       .then ({ json }) ->

@@ -1,5 +1,6 @@
 _ = require 'underscore'
 async = require 'async'
+manikinTools = require 'manikin-tools'
 
 exports.respond = (req, res, data, result) ->
   code = result || 200
@@ -15,12 +16,11 @@ exports.verb = (app, route, middleware, callback) ->
   app.post '/' + route, middleware, callback
   verbs.push route
 
-exports.exec = (app, db, getUserFromDbCore, config = {}) ->
+exports.exec = (app, db, mods, getUserFromDbCore, config = {}) ->
   config.authRealm ?= 'rester'
   config.verbose ?= true
 
-
-  mods = db.getModels()
+  allMeta = manikinTools.getMeta(mods)
 
   getUserFromDb = (req, callback) ->
     if req._hasCachedUser
@@ -114,8 +114,8 @@ exports.exec = (app, db, getUserFromDbCore, config = {}) ->
 
   Object.keys(mods).forEach (modelName) ->
 
-    owners = db.getMeta(modelName).owners
-    manyToMany = db.getMeta(modelName).manyToMany
+    owners = allMeta[modelName].owners
+    manyToMany = allMeta[modelName].manyToMany
 
     midFilter = (type) -> (req, res, next) ->
       authFuncs =
@@ -155,8 +155,8 @@ exports.exec = (app, db, getUserFromDbCore, config = {}) ->
 
     def2 'get', "/meta/#{modelName}", [], [], (req, callback) ->
       callback null,
-        owns: db.getMeta(modelName).owns.map((x) -> x.name)
-        fields: db.getMeta(modelName).fields
+        owns: allMeta[modelName].owns.map((x) -> x.name)
+        fields: allMeta[modelName].fields
 
     if owners.length == 0
       def2 'post', "/#{modelName}", [midFilter('create')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
@@ -249,7 +249,7 @@ exports.exec = (app, db, getUserFromDbCore, config = {}) ->
 
   def2 'get', '/', [], [], (req, callback) ->
     callback null,
-      roots: Object.keys(mods).filter((name) -> db.getMeta(name).owners.length == 0)
+      roots: Object.keys(mods).filter((name) -> allMeta[name].owners.length == 0)
       verbs: verbs
 
   # def2 'options', '*', [], [], (req, callback) ->
