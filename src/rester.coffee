@@ -127,7 +127,7 @@ exports.exec = (app, db, mods, getUserFromDbCore, config = {}) ->
 
       getUserFromDb req, (err, user) ->
         if err
-          exports.respond req, res, { err: "Error when getting user" }, 400
+          exports.respond req, res, { err: "unauthed" }, 401 # is this really the correct response? Write some better tests and decide.
           return
         filter = authFuncs[type](user)
         if !filter?
