@@ -127,7 +127,7 @@ exports.exec = (app, db, getUserFromDbCore, config = {}) ->
 
       getUserFromDb req, (err, user) ->
         if err
-          callback err
+          exports.respond req, res, { err: "Error when getting user" }, 400
           return
         filter = authFuncs[type](user)
         if !filter?
