@@ -42,8 +42,8 @@ qRequest = (config = {}) ->
 it "should have the right methods", ->
   rester.should.have.keys [
     'exec'
-    'verb'
-    'respond'
+    # 'verb'
+    # 'respond'
   ]
 
 
