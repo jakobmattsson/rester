@@ -85,76 +85,36 @@ exports.build = (db, mods, authinfo) ->
 
 
 
-  newdb.getMany = originals.getMany
-  newdb.delMany = originals.delMany
-  newdb.postMany = originals.postMany
-
-
-  # implementera filter-parametern i manikin-core
-  
   newdb.getMany = (primaryModel, primaryId, propertyName, filter, callback) ->
     {ref, inverseName} = manikinTools.getMeta(mods)[primaryModel].manyToMany.filter((x) -> x.name == propertyName)[0]
 
-    secondaryModel = ref # figure this out from our metadata, and "primaryModel" and "propertyName"
+    secondaryModel = ref
 
     async.map [
       { model: primaryModel, filter: { id: primaryId } }
       { model: secondaryModel, filter: filter }
     ], (item, callback) ->
-      authfilter = getModF(item.model, 'read')
-      x = authfilter(authinfo)
-      if !x
-        console.log("fail1")
-        callback("some kind of failure")
-        return
-
-      finalFilter = joinFilters(item.filter, x)
-      if !finalFilter?
-        console.log("fail2")
-        callback('some other kind of failure')
-        return
-
-      callback(null, finalFilter)
-
-    , (err, finalFilters) ->
-      return callback(err) if err?
-      originals.getOne.call this, primaryModel, { filter: finalFilters[0] }, (err) ->
-        return callback(err) if err?
+      stuff item.model, item.filter, 'read', callback
+    , propagate callback, (finalFilters) =>
+      originals.getOne.call this, primaryModel, { filter: finalFilters[0] }, propagate callback, ->
         originals.getMany(primaryModel, primaryId, propertyName, finalFilters[1], callback)
 
 
-  ###
+
   ['delMany', 'postMany'].forEach (manyMethod) ->
 
     newdb[manyMethod] = (primaryModel, primaryId, propertyName, secondaryId, callback) ->
-
-      secondaryModel = null # figure this out from our metadata, and "primaryModel" and "propertyName"
+      {ref, inverseName} = manikinTools.getMeta(mods)[primaryModel].manyToMany.filter((x) -> x.name == propertyName)[0]
+      secondaryModel = ref
 
       async.map [
         { model: primaryModel, filter: { id: primaryId } }
         { model: secondaryModel, filter: { id: secondaryId } }
       ], (item, callback) ->
-
-        authfilter = getModF(item.model, 'write')
-        x = authfilter(authinfo)
-        if !x
-          callback("some kind of failure")
-          return
-
-        finalFilter = joinFilters(item.filter, x)
-        if !finalFilter?
-          callback('some other kind of failure')
-          return
-
-        callback(null, finalFilter)
-
-      , (err, finalFilters) ->
-        return callback(err) if err?
-        originals.getOne.call this, primaryModel, { filter: finalFilters[0] }, (err) ->
-          return callback(err) if err?
-          originals.getOne.call this, secondaryModel, { filter: finalFilters[1] }, (err) ->
-            return callback(err) if err?
+        stuff item.model, item.filter, 'write', callback
+      , propagate callback, (finalFilters) =>
+        originals.getOne.call this, primaryModel, { filter: finalFilters[0] }, propagate callback, =>
+          originals.getOne.call this, secondaryModel, { filter: finalFilters[1] }, propagate callback, ->
             originals[manyMethod](primaryModel, primaryId, propertyName, secondaryId, callback)
-  ###
 
   newdb
