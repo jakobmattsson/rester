@@ -140,7 +140,7 @@ exports.build = (dbOrg, mods, getUserFromDbCore, config = {}) ->
     def2 'put', "/#{modelName}/:id", [naturalizeIn(mods[modelName].naturalId)], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, db, callback) ->
       db.putOne modelName, req.body, req.queryFilter || {}, callback
 
-    def2 'get', "/meta/#{modelName}", [], [], (req, callback) ->
+    def2 'get', "/meta/#{modelName}", [], [], (req, db, callback) ->
       callback null,
         owns: allMeta[modelName].owns.map((x) -> x.name)
         fields: allMeta[modelName].fields
