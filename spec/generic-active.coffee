@@ -9,6 +9,9 @@ expect = chai.expect
 generic = require jscov.cover('..', 'lib', 'generic')
 
 noErr = (f) -> (err, rest...) ->
+  if err
+    console.log "WHAAAAAT"
+    console.log err
   expect(err?).to.eql false
   f(rest...)
 
@@ -59,7 +62,7 @@ describe 'the list-operation', ->
       }
     }
     auth = sinon.stub().yieldsAsync()
-    res = generic.build(null, models, auth, { verbose: false })
+    res = generic.build({}, models, auth, { verbose: false })
     callRoute res, 'get', '/people', {}, (err, data) ->
       expect(err.message).to.eql 'unauthed'
       expect(data).to.eql undefined
@@ -106,7 +109,7 @@ describe 'the get-operation', ->
       }
     }
     auth = sinon.stub().yieldsAsync()
-    res = generic.build(null, models, auth, { verbose: false })
+    res = generic.build({}, models, auth, { verbose: false })
     callRoute res, 'get', '/people/:id', { params: { id: 789 } }, (err, data) ->
       expect(err.message).to.eql 'unauthed'
       expect(data).to.eql undefined
@@ -154,7 +157,7 @@ describe 'the put-operation', ->
       }
     }
     auth = sinon.stub().yieldsAsync()
-    res = generic.build(null, models, auth, { verbose: false })
+    res = generic.build({}, models, auth, { verbose: false })
     callRoute res, 'put', '/people/:id', { params: { id: 789 }, body: { v1: 100, v2: 200 } }, (err, data) ->
       expect(err.message).to.eql 'unauthed'
       expect(data).to.eql undefined
@@ -204,7 +207,7 @@ describe 'the del-operation', ->
       }
     }
     auth = sinon.stub().yieldsAsync()
-    res = generic.build(null, models, auth, { verbose: false })
+    res = generic.build({}, models, auth, { verbose: false })
     callRoute res, 'del', '/people/:id', { params: { id: 789 } }, (err, data) ->
       expect(err.message).to.eql 'unauthed'
       expect(data).to.eql undefined
@@ -316,11 +319,11 @@ describe "the auth-function of the model gets passed the result of the getUser f
         authCreate: sinon.mock().returns({})
       }
     }
-    db = get: sinon.stub().yieldsAsync()
+    db = post: sinon.stub().yieldsAsync()
     auth = (req, callback) -> callback(null, { name: 'foobar' })
 
     res = generic.build(db, models, auth, { verbose: false })
-    callRoute res, 'post', '/people', { }, ->
+    callRoute res, 'post', '/accounts/:id/people', { }, noErr ->
       expect(models.people.authCreate).calledWithExactly({ name: 'foobar' })
       done()
 
@@ -332,11 +335,11 @@ describe "the auth-function of the model gets passed the result of the getUser f
         authWrite: sinon.mock().returns({})
       }
     }
-    db = get: sinon.stub().yieldsAsync()
+    db = post: sinon.stub().yieldsAsync()
     auth = (req, callback) -> callback(null, { name: 'foobar' })
 
     res = generic.build(db, models, auth, { verbose: false })
-    callRoute res, 'post', '/people', { }, ->
+    callRoute res, 'post', '/accounts/:id/people', { }, noErr ->
       expect(models.people.authWrite).calledWithExactly({ name: 'foobar' })
       done()
 
@@ -348,11 +351,11 @@ describe "the auth-function of the model gets passed the result of the getUser f
         auth: sinon.mock().returns({})
       }
     }
-    db = get: sinon.stub().yieldsAsync()
+    db = post: sinon.stub().yieldsAsync()
     auth = (req, callback) -> callback(null, { name: 'foobar' })
 
     res = generic.build(db, models, auth, { verbose: false })
-    callRoute res, 'post', '/people', { }, ->
+    callRoute res, 'post', '/accounts/:id/people', { }, noErr ->
       expect(models.people.auth).calledWithExactly({ name: 'foobar' })
       done()
 

@@ -1,19 +1,12 @@
 _ = require 'underscore'
 async = require 'async'
 manikinTools = require 'manikin-tools'
+acm = require './access-controlled-manikin'
 
+AuthError = exports.AuthError = acm.AuthError
+ClientError = exports.ClientError = acm.ClientError
 
-class AuthError extends Error
-  constructor: (msg) -> @message = msg
-
-class ClientError extends Error
-  constructor: (msg) -> @message = msg
-
-
-exports.AuthError = AuthError
-exports.ClientError = ClientError
-
-exports.build = (db, mods, getUserFromDbCore, config = {}) ->
+exports.build = (dbOrg, mods, getUserFromDbCore, config = {}) ->
 
   # "mods" borde kunna hämtas som en funktion från "db". är det inte redan så till och med?
   # "request"-objektet som skickas in till getUserFromDbCore, vad måste det objektet uppfylla? Förslagsvis samma som rester.
@@ -56,11 +49,14 @@ exports.build = (db, mods, getUserFromDbCore, config = {}) ->
         async.reduce preMid, null, (m1, m2, callback) ->
           m2(req, callback)
         , errHandler ->
-          callback req, errHandler (data) ->
-            async.reduce postMid, data, (memo, mid, callback) ->
-              mid(req, data, callback)
-            , errHandler (result) ->
-              cbb(null, result)
+          getUserFromDb req, (err, usr) ->
+            return cbb(err) if err?
+            db = acm.build(dbOrg, mods, usr, config)
+            callback req, db, errHandler (data) ->
+              async.reduce postMid, data, (memo, mid, callback) ->
+                mid(req, data, callback)
+              , errHandler (result) ->
+                cbb(null, result)
       catch ex
         cbb(new Error(ex.toString()))
 
@@ -132,40 +128,17 @@ exports.build = (db, mods, getUserFromDbCore, config = {}) ->
     owners = allMeta[modelName].owners
     manyToMany = allMeta[modelName].manyToMany
 
-    midFilter = (type) -> (req, cb) ->
-      authFuncs =
-        read: mods[modelName].auth || -> {}
-        write: mods[modelName].authWrite
-        create: mods[modelName].authCreate
-      authFuncs.write ?= authFuncs.read
-      authFuncs.create ?= authFuncs.write
+    def2 'get', "/#{modelName}", [], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, db, callback) ->
+      db.list modelName, req.queryFilter || {}, callback
 
-      getUserFromDb req, (err, user) ->
-        if err
-          cb(new AuthError('unauthed'))
-          return
-        filter = authFuncs[type](user)
-        if !filter?
-          cb(new AuthError('unauthed'))
-          return
+    def2 'get', "/#{modelName}/:id", [naturalizeIn(mods[modelName].naturalId)], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, db, callback) ->
+      db.getOne modelName, { filter: req.queryFilter || {} }, callback
 
-        req.queryFilter = joinFilters(filter, req.queryFilter)
-        if !req.queryFilter?
-          cb(new ClientError('No such id'))
-        else
-          cb()
+    def2 'del', "/#{modelName}/:id", [naturalizeIn(mods[modelName].naturalId)], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, db, callback) ->
+      db.delOne modelName, req.queryFilter || {}, callback
 
-    def2 'get', "/#{modelName}", [midFilter('read')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
-      db.list modelName, req.queryFilter, callback
-
-    def2 'get', "/#{modelName}/:id", [naturalizeIn(mods[modelName].naturalId), midFilter('read')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
-      db.getOne modelName, { filter: req.queryFilter }, callback
-
-    def2 'del', "/#{modelName}/:id", [naturalizeIn(mods[modelName].naturalId), midFilter('write')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
-      db.delOne modelName, req.queryFilter, callback
-
-    def2 'put', "/#{modelName}/:id", [naturalizeIn(mods[modelName].naturalId), midFilter('write')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
-      db.putOne modelName, req.body, req.queryFilter, callback
+    def2 'put', "/#{modelName}/:id", [naturalizeIn(mods[modelName].naturalId)], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, db, callback) ->
+      db.putOne modelName, req.body, req.queryFilter || {}, callback
 
     def2 'get', "/meta/#{modelName}", [], [], (req, callback) ->
       callback null,
@@ -173,12 +146,12 @@ exports.build = (db, mods, getUserFromDbCore, config = {}) ->
         fields: allMeta[modelName].fields
 
     if owners.length == 0
-      def2 'post', "/#{modelName}", [midFilter('create')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
+      def2 'post', "/#{modelName}", [], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, db, callback) ->
         db.post modelName, req.body, callback
 
     owners.forEach (owner) ->
-      def2 'get', "/#{owner.plur}/:id/#{modelName}", [midFilter('read')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
-        filter = req.queryFilter
+      def2 'get', "/#{owner.plur}/:id/#{modelName}", [], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, db, callback) ->
+        filter = req.queryFilter || {}
         id = req.params.id
         outer = owner.sing
 
@@ -204,8 +177,9 @@ exports.build = (db, mods, getUserFromDbCore, config = {}) ->
         db.list modelName, filter, callback
 
 
-      def2 'post', "/#{modelName}", [midFilter('create')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
+      def2 'post', "/#{modelName}", [], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, db, callback) ->
         data = req.body
+        req.queryFilter ?= {}
 
         # This doesn't seem to work with natural IDs.
         #
@@ -230,7 +204,8 @@ exports.build = (db, mods, getUserFromDbCore, config = {}) ->
 
         db.post modelName, data, callback
 
-      def2 'post', "/#{owner.plur}/:id/#{modelName}", [midFilter('create')], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, callback) ->
+      def2 'post', "/#{owner.plur}/:id/#{modelName}", [], [naturalizeOut(mods[modelName].naturalId), fieldFilterMiddleware(mods[modelName].fieldFilter)], (req, db, callback) ->
+        req.queryFilter ?= {}
         data = _.extend({}, req.body, _.object([[owner.sing, req.params.id]]))
 
         # <natural-id>
@@ -250,13 +225,13 @@ exports.build = (db, mods, getUserFromDbCore, config = {}) ->
         db.post modelName, data, callback
 
     manyToMany.forEach (many) ->
-      def2 'post', "/#{modelName}/:id/#{many.name}/:other", [midFilter('write')], [], (req, callback) ->
+      def2 'post', "/#{modelName}/:id/#{many.name}/:other", [], [], (req, db, callback) ->
         db.postMany modelName, req.params.id, many.name, req.params.other, callback
 
-      def2 'get', "/#{modelName}/:id/#{many.name}", [midFilter('read')], [], (req, callback) ->
-        db.getMany modelName, req.params.id, many.name, callback
+      def2 'get', "/#{modelName}/:id/#{many.name}", [], [], (req, db, callback) ->
+        db.getMany modelName, req.params.id, many.name, {}, callback
 
-      def2 'del', "/#{modelName}/:id/#{many.name}/:other", [midFilter('write')], [], (req, callback) ->
+      def2 'del', "/#{modelName}/:id/#{many.name}/:other", [], [], (req, db, callback) ->
         db.getOne many.ref, { id: req.params.other }, (err, data) ->
           db.delMany modelName, req.params.id, many.name, req.params.other, (innerErr) ->
             callback(err || innerErr, data)
