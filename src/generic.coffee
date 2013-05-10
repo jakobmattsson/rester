@@ -6,12 +6,17 @@ acm = require './access-controlled-manikin'
 AuthError = exports.AuthError = acm.AuthError
 ClientError = exports.ClientError = acm.ClientError
 
+propagate = (onErr, onSucc) ->
+  (err, rest...) ->
+    return onErr(err) if err?
+    return onSucc(rest...)
+
+
 exports.build = (dbOrg, mods, getUserFromDbCore, config = {}) ->
 
   # "mods" borde kunna hämtas som en funktion från "db". är det inte redan så till och med?
   # "request"-objektet som skickas in till getUserFromDbCore, vad måste det objektet uppfylla? Förslagsvis samma som rester.
 
-  config.authRealm ?= 'rester'
   config.verbose ?= true
 
   returnedResult = []
@@ -22,10 +27,7 @@ exports.build = (dbOrg, mods, getUserFromDbCore, config = {}) ->
     if req._hasCachedUser
       callback(null, req._cachedUser)
       return
-    getUserFromDbCore req, (err, result) ->
-      if err
-        callback(err)
-        return
+    getUserFromDbCore req, propagate callback, (result) ->
       req._hasCachedUser = true
       req._cachedUser = result
       callback(null, result)
@@ -36,26 +38,19 @@ exports.build = (dbOrg, mods, getUserFromDbCore, config = {}) ->
       # What else should there be in q request object?
       req.params ?= {}
 
-      errHandler = (f) ->
-        (err, data) ->
-          if err
-            cbb(err)
-            return
-          f(data)
-
       try
         console.log(req.method, req.url) if config.verbose
 
         async.reduce preMid, null, (m1, m2, callback) ->
           m2(req, callback)
-        , errHandler ->
+        , propagate cbb, ->
           getUserFromDb req, (err, usr) ->
             return cbb(err) if err?
-            db = acm.build(dbOrg, mods, usr, config)
-            callback req, db, errHandler (data) ->
+            db = acm.build(dbOrg, mods, usr)
+            callback req, db, propagate cbb, (data) ->
               async.reduce postMid, data, (memo, mid, callback) ->
                 mid(req, data, callback)
-              , errHandler (result) ->
+              , propagate cbb, (result) ->
                 cbb(null, result)
       catch ex
         cbb(new Error(ex.toString()))
@@ -90,11 +85,7 @@ exports.build = (dbOrg, mods, getUserFromDbCore, config = {}) ->
       callback(null, outdata)
       return
 
-    getUserFromDb req, (err, user) ->
-      if err
-        callback err
-        return
-
+    getUserFromDb req, propagate callback, (user) ->
       evaledFilter = fieldFilter(user)
 
       if Array.isArray(outdata)

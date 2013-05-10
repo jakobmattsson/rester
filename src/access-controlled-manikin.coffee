@@ -13,9 +13,9 @@ class ClientError extends Error
 
 
 joinFilters = (filter1, filter2) ->
-  return undefined if !filter1? || !filter2?
+  return if !filter1? || !filter2?
   dupKeys = _.intersection(Object.keys(filter1), Object.keys(filter2))
-  return undefined if dupKeys.some (name) -> filter1[name]?.toString() != filter2[name]?.toString()
+  return if dupKeys.some (name) -> filter1[name]?.toString() != filter2[name]?.toString()
   _.extend({}, filter1, filter2)
 
 
@@ -29,13 +29,9 @@ exports.AuthError = AuthError
 exports.ClientError = ClientError
 exports.build = (db, mods, authinfo) ->
 
-  originals = db
+  metaData = manikinTools.getMeta(mods)
 
-  newdb = {}
-  newdb.connect = originals.connect
-  newdb.close = originals.close
-
-  getModF = (model, func) ->
+  getAuthorizationFunc = (model, func) ->
     funcs = {
       read: mods[model].auth || -> {}
       write: mods[model].authWrite
@@ -45,10 +41,8 @@ exports.build = (db, mods, authinfo) ->
     funcs.create ?= funcs.write
     funcs[func]
 
-
-
-  stuff = (model, filter, level, callback) ->
-    authfilter = getModF(model, level)
+  authorizationFilter = (model, filter, level, callback) ->
+    authfilter = getAuthorizationFunc(model, level)
     x = authfilter(authinfo)
     if !x
       callback(new AuthError('unauthed'))
@@ -61,60 +55,59 @@ exports.build = (db, mods, authinfo) ->
 
     callback(null, finalFilter)
 
+  getSecondaryModelInManyToMany = (primaryModel, propertyName) ->
+    metaData[primaryModel].manyToMany.filter((x) -> x.name == propertyName)[0].ref
 
+
+
+  newdb = {}
+  newdb.connect = db.connect
+  newdb.close = db.close
 
   newdb.post = (model, indata, callback) ->
-    stuff model, {}, 'create', propagate callback, (finalFilter) =>
-      originals.post.call(this, model, indata, callback)
+    authorizationFilter model, {}, 'create', propagate callback, (finalFilter) =>
+      db.post.call(this, model, indata, callback)
 
   newdb.list = (model, filter, callback) ->
-    stuff model, filter, 'read', propagate callback, (finalFilter) =>
-      originals.list.call(this, model, finalFilter, callback)
+    authorizationFilter model, filter, 'read', propagate callback, (finalFilter) =>
+      db.list.call(this, model, finalFilter, callback)
 
   newdb.getOne = (model, config, callback) ->
-    stuff model, config.filter || {}, 'read', propagate callback, (finalFilter) =>
-      originals.getOne.call(this, model, _.extend({}, config, { filter: finalFilter }), callback)
+    authorizationFilter model, config.filter || {}, 'read', propagate callback, (finalFilter) =>
+      db.getOne.call(this, model, _.extend({}, config, { filter: finalFilter }), callback)
 
   newdb.delOne = (model, filter, callback) ->
-    stuff model, filter, 'write', propagate callback, (finalFilter) =>
-      originals.delOne.call(this, model, finalFilter, callback)
+    authorizationFilter model, filter, 'write', propagate callback, (finalFilter) =>
+      db.delOne.call(this, model, finalFilter, callback)
 
   newdb.putOne = (model, data, filter, callback) ->
-    stuff model, filter, 'write', propagate callback, (finalFilter) =>
-      originals.putOne.call(this, model, data, finalFilter, callback)
-
-
+    authorizationFilter model, filter, 'write', propagate callback, (finalFilter) =>
+      db.putOne.call(this, model, data, finalFilter, callback)
 
   newdb.getMany = (primaryModel, primaryId, propertyName, filter, callback) ->
-    {ref, inverseName} = manikinTools.getMeta(mods)[primaryModel].manyToMany.filter((x) -> x.name == propertyName)[0]
-
-    secondaryModel = ref
+    secondaryModel = getSecondaryModelInManyToMany(primaryModel, propertyName)
 
     async.map [
       { model: primaryModel, filter: { id: primaryId } }
       { model: secondaryModel, filter: filter }
     ], (item, callback) ->
-      stuff item.model, item.filter, 'read', callback
+      authorizationFilter(item.model, item.filter, 'read', callback)
     , propagate callback, (finalFilters) =>
-      originals.getOne.call this, primaryModel, { filter: finalFilters[0] }, propagate callback, ->
-        originals.getMany(primaryModel, primaryId, propertyName, finalFilters[1], callback)
-
-
+      db.getOne.call this, primaryModel, { filter: finalFilters[0] }, propagate callback, ->
+        db.getMany(primaryModel, primaryId, propertyName, finalFilters[1], callback)
 
   ['delMany', 'postMany'].forEach (manyMethod) ->
 
     newdb[manyMethod] = (primaryModel, primaryId, propertyName, secondaryId, callback) ->
-      {ref, inverseName} = manikinTools.getMeta(mods)[primaryModel].manyToMany.filter((x) -> x.name == propertyName)[0]
-      secondaryModel = ref
+      secondaryModel = getSecondaryModelInManyToMany(primaryModel, propertyName)
 
       async.map [
         { model: primaryModel, filter: { id: primaryId } }
         { model: secondaryModel, filter: { id: secondaryId } }
-      ], (item, callback) ->
-        stuff item.model, item.filter, 'write', callback
-      , propagate callback, (finalFilters) =>
-        originals.getOne.call this, primaryModel, { filter: finalFilters[0] }, propagate callback, =>
-          originals.getOne.call this, secondaryModel, { filter: finalFilters[1] }, propagate callback, ->
-            originals[manyMethod](primaryModel, primaryId, propertyName, secondaryId, callback)
+      ], (item, callback) =>
+        authorizationFilter item.model, item.filter, 'write', propagate callback, (ff) =>
+          db.getOne.call(this, item.model, { filter: ff }, callback)
+      , propagate callback, ->
+        db[manyMethod](primaryModel, primaryId, propertyName, secondaryId, callback)
 
   newdb

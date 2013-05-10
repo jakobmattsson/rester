@@ -12,6 +12,8 @@ respond = (req, res, data, result) ->
 
 exports.exec = (app, db, mods, getUserFromDbCore, config = {}) ->
 
+  config.authRealm ?= 'rester'
+
   rr = gen.build(db, mods, getUserFromDbCore, config)
 
   res = rr.routes
