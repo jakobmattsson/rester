@@ -1,10 +1,4 @@
 jscov = require 'jscov'
-generic = require jscov.cover('..', 'lib', 'generic')
-should = require 'should'
-express = require 'express'
-manikin = require 'manikin-mongodb' # använd memory-varianten istället för att köra tester
-mongojs = require 'mongojs'
-_ = require 'underscore'
 sinon = require 'sinon'
 chai = require 'chai'
 sinonChai = require 'sinon-chai'
@@ -12,44 +6,53 @@ sinonChai = require 'sinon-chai'
 chai.use sinonChai
 expect = chai.expect
 
+generic = require jscov.cover('..', 'lib', 'generic')
+
+noErr = (f) -> (err, rest...) ->
+  expect(err?).to.eql false
+  f(rest...)
 
 
 callRoute = (res, met, rot, req, callback) ->
   matches = res.routes.filter(({ method, route }) -> method == met && route == rot)
-  matches.length.should.eql 1
+  expect(matches.length).to.eql 1
   matches[0].callback(req, callback)
 
 
-describe 'build', ->
 
-  it "invokes the list-operation correctly when there is no auth-restriction", (done) ->
+describe 'the list-operation', ->
+
+  it "invokes correctly when there is no auth-restriction", (done) ->
     models = { people: {} }
-    db = { list: sinon.mock().yieldsAsync() }
+    result = Math.random()
+    db = { list: sinon.mock().yieldsAsync(undefined, result) }
     auth = sinon.stub().yieldsAsync()
     res = generic.build(db, models, auth, { verbose: false })
 
-    callRoute res, 'get', '/people', { }, ->
+    callRoute res, 'get', '/people', { }, noErr (data) ->
       expect(db.list).calledWith('people', { })
+      expect(data).to.eql result
       done()
 
 
 
-  it "invokes the list-operation correctly when the user is partially authorized", (done) ->
+  it "invokes correctly when the user is partially authorized", (done) ->
     models =
       people:
         auth: -> { x: 1 }
 
-    user = { name: 'jakob' }
-    db = { list: sinon.mock().yieldsAsync() }
+    result = Math.random()
+    db = { list: sinon.mock().yieldsAsync(null, result) }
     auth = sinon.stub().yieldsAsync()
     res = generic.build(db, models, auth, { verbose: false })
-    callRoute res, 'get', '/people', {}, ->
+    callRoute res, 'get', '/people', {}, noErr (data) ->
       expect(db.list).calledWith('people', { x: 1 })
+      expect(data).to.eql result
       done()
 
 
 
-  it "invokes the list-operation correctly when the user is not authorized", (done) ->
+  it "invokes correctly when the user is not authorized", (done) ->
     models = {
       people: {
         auth: -> null
@@ -61,6 +64,157 @@ describe 'build', ->
       expect(err.message).to.eql 'unauthed'
       expect(data).to.eql undefined
       done()
+
+
+
+describe 'the get-operation', ->
+
+  it "invokes correctly when there is no auth-restriction", (done) ->
+    models = { people: {} }
+    result = Math.random()
+    db = { getOne: sinon.mock().yieldsAsync(null, { res: result }) }
+    auth = sinon.stub().yieldsAsync()
+    res = generic.build(db, models, auth, { verbose: false })
+
+    callRoute res, 'get', '/people/:id', { params: { id: 123 } }, noErr (data) ->
+      expect(db.getOne).calledWith('people', { filter: { id: 123 } })
+      expect(data).to.eql { res: result }
+      done()
+
+
+
+  it "invokes correctly when the user is partially authorized", (done) ->
+    models =
+      people:
+        auth: -> { x: 1 }
+
+    result = Math.random()
+    db = { getOne: sinon.mock().yieldsAsync(null, { res: result }) }
+    auth = sinon.stub().yieldsAsync()
+    res = generic.build(db, models, auth, { verbose: false })
+    callRoute res, 'get', '/people/:id', { params: { id: 456 } }, noErr (data) ->
+      expect(db.getOne).calledWith('people', { filter: { x: 1, id: 456 } })
+      expect(data).to.eql { res: result }
+      done()
+
+
+
+  it "invokes correctly when the user is not authorized", (done) ->
+    models = {
+      people: {
+        auth: -> null
+      }
+    }
+    auth = sinon.stub().yieldsAsync()
+    res = generic.build(null, models, auth, { verbose: false })
+    callRoute res, 'get', '/people/:id', { params: { id: 789 } }, (err, data) ->
+      expect(err.message).to.eql 'unauthed'
+      expect(data).to.eql undefined
+      done()
+
+
+
+
+describe 'the put-operation', ->
+
+  it "invokes correctly when there is no auth-restriction", (done) ->
+    models = { people: {} }
+    result = Math.random()
+    db = { putOne: sinon.mock().yieldsAsync(null, { r: result }) }
+    auth = sinon.stub().yieldsAsync()
+    res = generic.build(db, models, auth, { verbose: false })
+
+    callRoute res, 'put', '/people/:id', { params: { id: 123 }, body: { v1: 100, v2: 200 }  }, noErr (data) ->
+      expect(db.putOne).calledWith('people', { v1: 100, v2: 200 }, { id: 123 })
+      expect(data).to.eql { r: result }
+      done()
+
+
+
+  it "invokes correctly when the user is partially authorized", (done) ->
+    models =
+      people:
+        auth: -> { x: 1 }
+
+    result = Math.random()
+    db = { putOne: sinon.mock().yieldsAsync(undefined, { result }) }
+    auth = sinon.stub().yieldsAsync()
+    res = generic.build(db, models, auth, { verbose: false })
+    callRoute res, 'put', '/people/:id', { params: { id: 456 }, body: { v1: 100, v2: 200 }  }, noErr (data) ->
+      expect(db.putOne).calledWith('people', { v1: 100, v2: 200 }, { x: 1, id: 456 })
+      expect(data).to.eql { result: result }
+      done()
+
+
+
+  it "invokes correctly when the user is not authorized", (done) ->
+    models = {
+      people: {
+        auth: -> null
+      }
+    }
+    auth = sinon.stub().yieldsAsync()
+    res = generic.build(null, models, auth, { verbose: false })
+    callRoute res, 'put', '/people/:id', { params: { id: 789 }, body: { v1: 100, v2: 200 } }, (err, data) ->
+      expect(err.message).to.eql 'unauthed'
+      expect(data).to.eql undefined
+      done()
+
+
+
+
+
+
+describe 'the del-operation', ->
+
+  it "invokes correctly when there is no auth-restriction", (done) ->
+    models = { people: {} }
+    result = Math.random()
+    db = { delOne: sinon.mock().yieldsAsync(null, { res: result }) }
+    auth = sinon.stub().yieldsAsync()
+    res = generic.build(db, models, auth, { verbose: false })
+
+    callRoute res, 'del', '/people/:id', { params: { id: 123 } }, noErr (data) ->
+      expect(db.delOne).calledWith('people', { id: 123 })
+      expect(data).to.eql { res: result }
+      done()
+
+
+
+  it "invokes correctly when the user is partially authorized", (done) ->
+    models =
+      people:
+        auth: -> { x: 1 }
+
+    result = Math.random()
+    db = { delOne: sinon.mock().yieldsAsync(null, { res: result }) }
+    auth = sinon.stub().yieldsAsync()
+    res = generic.build(db, models, auth, { verbose: false })
+    callRoute res, 'del', '/people/:id', { params: { id: 456 } }, noErr (data) ->
+      expect(db.delOne).calledWith('people', { x: 1, id: 456 })
+      expect(data).to.eql { res: result }
+      done()
+
+
+
+  it "invokes correctly when the user is not authorized", (done) ->
+    models = {
+      people: {
+        auth: -> null
+      }
+    }
+    auth = sinon.stub().yieldsAsync()
+    res = generic.build(null, models, auth, { verbose: false })
+    callRoute res, 'del', '/people/:id', { params: { id: 789 } }, (err, data) ->
+      expect(err.message).to.eql 'unauthed'
+      expect(data).to.eql undefined
+      done()
+
+
+
+
+
+
 
 
 
