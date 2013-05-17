@@ -21,15 +21,6 @@ listRoutes = (res) ->
 
 
 
-['AuthError', 'ClientError'].forEach (error) ->
-
-  describe error, ->
-
-    it "is an error", ->
-      (new generic[error]()).should.be.an.instanceof Error
-
-    it "propagates the error message", ->
-      (new generic[error]('hello')).message.should.eql 'hello'
 
 
 

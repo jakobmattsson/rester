@@ -4,29 +4,35 @@ manikinTools = require 'manikin-tools'
 
 
 
-class AuthError extends Error
-  constructor: (msg) -> @message = msg
-
-class ClientError extends Error
-  constructor: (msg) -> @message = msg
-
-
-
-joinFilters = (filter1, filter2) ->
-  return if !filter1? || !filter2?
-  dupKeys = _.intersection(Object.keys(filter1), Object.keys(filter2))
-  return if dupKeys.some (name) -> filter1[name]?.toString() != filter2[name]?.toString()
-  _.extend({}, filter1, filter2)
-
-
 propagate = (onErr, onSucc) ->
   (err, rest...) ->
     return onErr(err) if err?
     return onSucc(rest...)
 
 
-exports.AuthError = AuthError
-exports.ClientError = ClientError
+
+exports.AuthError = class AuthError extends Error
+  constructor: (msg) -> @message = msg
+
+
+
+exports.ClientError = class ClientError extends Error
+  constructor: (msg) -> @message = msg
+
+
+
+exports.joinFilters = joinFilters = (args...) ->
+  cured = args.map (x) -> x || {}
+  return {} if args.length == 0
+  cured.slice(1).reduce (memo, arg) ->
+    return if !memo?
+    dupKeys = _.intersection(Object.keys(memo), Object.keys(arg))
+    return if dupKeys.some (name) -> memo[name].toString() != arg[name].toString()
+    _.extend({}, memo, arg)
+  , cured[0]
+
+
+
 exports.build = (db, mods, authinfo) ->
 
   metaData = manikinTools.getMeta(mods)
@@ -65,8 +71,8 @@ exports.build = (db, mods, authinfo) ->
   newdb.close = db.close
 
   newdb.post = (model, indata, callback) ->
-    authorizationFilter model, {}, 'create', propagate callback, (finalFilter) =>
-      db.post.call(this, model, indata, callback)
+    authorizationFilter model, indata, 'create', propagate callback, (finalData) =>
+      db.post.call(this, model, finalData, callback)
 
   newdb.list = (model, filter, callback) ->
     authorizationFilter model, filter, 'read', propagate callback, (finalFilter) =>
@@ -85,11 +91,9 @@ exports.build = (db, mods, authinfo) ->
       db.putOne.call(this, model, data, finalFilter, callback)
 
   newdb.getMany = (primaryModel, primaryId, propertyName, filter, callback) ->
-    secondaryModel = getSecondaryModelInManyToMany(primaryModel, propertyName)
-
     async.map [
       { model: primaryModel, filter: { id: primaryId } }
-      { model: secondaryModel, filter: filter }
+      { model: getSecondaryModelInManyToMany(primaryModel, propertyName), filter: filter }
     ], (item, callback) ->
       authorizationFilter(item.model, item.filter, 'read', callback)
     , propagate callback, (finalFilters) =>
@@ -97,13 +101,10 @@ exports.build = (db, mods, authinfo) ->
         db.getMany(primaryModel, primaryId, propertyName, finalFilters[1], callback)
 
   ['delMany', 'postMany'].forEach (manyMethod) ->
-
     newdb[manyMethod] = (primaryModel, primaryId, propertyName, secondaryId, callback) ->
-      secondaryModel = getSecondaryModelInManyToMany(primaryModel, propertyName)
-
       async.map [
         { model: primaryModel, filter: { id: primaryId } }
-        { model: secondaryModel, filter: { id: secondaryId } }
+        { model: getSecondaryModelInManyToMany(primaryModel, propertyName), filter: { id: secondaryId } }
       ], (item, callback) =>
         authorizationFilter item.model, item.filter, 'write', propagate callback, (ff) =>
           db.getOne.call(this, item.model, { filter: ff }, callback)

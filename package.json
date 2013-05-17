@@ -24,7 +24,7 @@
     "chai": "1.5.0",
     "sinon": "1.6.0",
     "sinon-chai": "2.3.1",
-    "jscov": "0.4.1",
+    "jscov": "0.5.4",
     "mocha-term-cov-reporter": "0.1.0",
     "mocha": "1.8.1",
     "mongojs": "0.6.2",

@@ -1,6 +1,7 @@
 gen = require './generic'
+acm = require './access-controlled-manikin'
 
-{ClientError, AuthError} = gen
+{ClientError, AuthError} = acm
 
 respond = (req, res, data, result) ->
   code = result || 200
@@ -9,6 +10,8 @@ respond = (req, res, data, result) ->
   else
     res.json data, code
 
+
+exports.acm = acm
 
 exports.exec = (app, db, mods, getUserFromDbCore, config = {}) ->
 
@@ -19,7 +22,6 @@ exports.exec = (app, db, mods, getUserFromDbCore, config = {}) ->
   res = rr.routes
 
   res.forEach (x) ->
-    # console.log(x.method, x.route)
     app[x.method].call app, x.route, (req, res) ->
 
       x.callback req, (err, data) ->
