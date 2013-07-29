@@ -1,0 +1,23 @@
+req
+====
+query # the querystring
+method # GET, POST etc
+url # den faktiska urlen (inklusive querystring?)
+params # parametrar som regexpats ur urlen
+body # måste vara json eller null
+headers # guess...
+
+
+res
+====
+svara med ett json-object och en 200
+hantera error (felmeddelande samt en http-kod)
+hantera unauthed (401)
+
+
+overall
+=======
+* vad rester gör är inte någon statemanipulation. den ska bara returnera en lista med objekt på följande format:
+  - method
+  - url (med params i)
+  - en callback som tar ett requestobjekt och en callback
