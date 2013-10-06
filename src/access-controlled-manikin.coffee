@@ -35,7 +35,7 @@ exports.joinFilters = joinFilters = (args...) ->
 
 exports.build = (db, mods, authinfo) ->
 
-  metaData = manikinTools.getMeta(mods)
+  metaData = manikinTools.getMeta(manikinTools.desugar(mods))
 
   getAuthorizationFunc = (model, func) ->
     funcs = {

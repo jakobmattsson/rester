@@ -17,7 +17,7 @@ exports.build = (manikin, mods, getUserFromDbCore, config = {}) ->
 
   config.verbose ?= true
   returnedResult = []
-  allMeta = manikinTools.getMeta(mods)
+  allMeta = manikinTools.getMeta(manikinTools.desugar(mods))
 
   getUserFromDb = (req, callback) ->
     return callback(null, req._cachedUser) if req._hasCachedUser
