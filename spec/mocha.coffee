@@ -55,7 +55,8 @@ it "should do things", (done) ->
 
   # define the app
   app = express()
-  app.use express.bodyParser()
+  app.use express.json()
+  app.use express.urlencoded()
   app.use express.responseTime()
 
   # define the auth
