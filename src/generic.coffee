@@ -49,7 +49,7 @@ exports.build = (manikin, mods, getUserFromDbCore, config = {}) ->
     manyToMany = allMeta[modelName].manyToMany
 
     def 'get', "/#{modelName}", (req, db, callback) ->
-      db.list(modelName, {}, callback)
+      db.list(modelName, req.query, callback)
 
     def 'get', "/#{modelName}/:id", (req, db, callback) ->
       db.getOne(modelName, { filter: { id: req.params.id } }, callback)
