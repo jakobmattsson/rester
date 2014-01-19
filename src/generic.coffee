@@ -11,6 +11,13 @@ propagate = (onErr, onSucc) ->
 startsWith = (str, substr) ->
   str.slice(0, substr.length) == substr
 
+getFilterObject = (query) ->
+  prefix = 'filter:'
+  filteredObject = _.pairs(query).filter(([key, value]) -> startsWith(key, prefix))
+  remappedObject = filteredObject.map ([key, value]) -> [key.slice(prefix.length), value]
+  _.object remappedObject
+
+
 
 exports.build = (manikin, mods, getUserFromDbCore, config = {}) ->
 
@@ -52,11 +59,7 @@ exports.build = (manikin, mods, getUserFromDbCore, config = {}) ->
     manyToMany = allMeta[modelName].manyToMany
 
     def 'get', "/#{modelName}", (req, db, callback) ->
-      prefix = 'filter:'
-      filteredObject = _.pairs(req.query).filter(([key, value]) -> startsWith(key, prefix))
-      remappedObject = filteredObject.map ([key, value]) -> [key.slice(prefix.length), value]
-      newFilterObject = _.object remappedObject
-      console.log(newFilterObject)
+      newFilterObject = getFilterObject(req.query)
       db.list(modelName, newFilterObject, callback)
 
     def 'get', "/#{modelName}/:id", (req, db, callback) ->
