@@ -71,8 +71,8 @@ describe 'the list-operation', ->
     db = list: sinon.mock().yieldsAsync()
     res = acm.build(db, models, {})
 
-    res.list 'people', { lastName: 'doe' }, noErr (data) ->
-      expect(db.list).calledWith('people', { lastName: 'doe' })
+    res.list 'people', { filter: { lastName: 'doe' } }, noErr (data) ->
+      expect(db.list).calledWith('people', { filter: { lastName: 'doe' } })
       done()
 
   it "invokes incorrectly given overlapping auth object and filter, with different values", (done) ->
@@ -80,7 +80,7 @@ describe 'the list-operation', ->
     db = list: sinon.mock().yieldsAsync()
     res = acm.build(db, models, {})
 
-    res.list 'people', { lastName: 'doe' }, (err, data) ->
+    res.list 'people', { filter: { lastName: 'doe' } }, (err, data) ->
       expect(db.list).notCalled
       expect(err.message).to.eql 'unauthed'
       done()
@@ -97,7 +97,7 @@ describe 'the list-operation', ->
     res = acm.build(db, models, {})
 
     res.list 'people', { }, noErr (data) ->
-      expect(db.list).calledWith('people', { })
+      expect(db.list).calledWith('people', { filter: {} })
       expect(data).to.eql result
       done()
 
@@ -109,7 +109,7 @@ describe 'the list-operation', ->
     db = { list: sinon.mock().yieldsAsync(null, result) }
     res = acm.build(db, models, null)
     res.list 'people', null, noErr (data) ->
-      expect(db.list).calledWith('people', { x: 1 })
+      expect(db.list).calledWith('people', { filter: { x: 1 } })
       expect(data).to.eql result
       done()
 
