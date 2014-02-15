@@ -74,9 +74,9 @@ exports.build = (db, mods, authinfo) ->
     authorizationFilter model, indata, 'create', propagate callback, (finalData) =>
       db.post.call(this, model, finalData, callback)
 
-  newdb.list = (model, filter, callback) ->
-    authorizationFilter model, filter, 'read', propagate callback, (finalFilter) =>
-      db.list.call(this, model, finalFilter, callback)
+  newdb.list = (model, config, callback) ->
+    authorizationFilter model, (config.filter || {}), 'read', propagate callback, (finalFilter) =>
+      db.list.call(this, model, _.extend({}, config, { filter: finalFilter }), callback)
 
   newdb.getOne = (model, config, callback) ->
     authorizationFilter model, config.filter || {}, 'read', propagate callback, (finalFilter) =>

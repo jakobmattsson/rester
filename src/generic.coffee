@@ -60,7 +60,7 @@ exports.build = (manikin, mods, getUserFromDbCore, config = {}) ->
 
     def 'get', "/#{modelName}", (req, db, callback) ->
       newFilterObject = getFilterObject(req.query)
-      db.list(modelName, newFilterObject, callback)
+      db.list(modelName, { filter: newFilterObject }, callback)
 
     def 'get', "/#{modelName}/:id", (req, db, callback) ->
       db.getOne(modelName, { filter: { id: req.params.id } }, callback)
@@ -81,7 +81,7 @@ exports.build = (manikin, mods, getUserFromDbCore, config = {}) ->
 
     owners.forEach (owner) ->
       def 'get', "/#{owner.plur}/:id/#{modelName}", (req, db, callback) ->
-        db.list(modelName, _.object([[owner.sing, req.params.id]]), callback)
+        db.list(modelName, { filter: _.object([[owner.sing, req.params.id]]) }, callback)
 
       def 'post', "/#{owner.plur}/:id/#{modelName}", (req, db, callback) ->
         db.post(modelName, _.extend({}, req.body, _.object([[owner.sing, req.params.id]])), callback)
