@@ -17,6 +17,12 @@ getFilterObject = (query) ->
   remappedObject = filteredObject.map ([key, value]) -> [key.slice(prefix.length), value]
   _.object remappedObject
 
+getSortObject = (query) ->
+  prefix = 'sort:'
+  filteredObject = _.pairs(query).filter(([key, value]) -> startsWith(key, prefix))
+  remappedObject = filteredObject.map ([key, value]) -> [key.slice(prefix.length), value || 'ascending']
+  _.object remappedObject
+
 
 
 exports.build = (manikin, mods, getUserFromDbCore, config = {}) ->
@@ -59,8 +65,16 @@ exports.build = (manikin, mods, getUserFromDbCore, config = {}) ->
     manyToMany = allMeta[modelName].manyToMany
 
     def 'get', "/#{modelName}", (req, db, callback) ->
-      newFilterObject = getFilterObject(req.query)
-      db.list(modelName, { filter: newFilterObject }, callback)
+      conf = {
+        filter: getFilterObject(req.query)
+        sort: getSortObject(req.query)
+      }
+      if req.query.limit?
+        conf.limit = parseInt(req.query.limit, 10)
+      if req.query.skip?
+        conf.skip = parseInt(req.query.skip, 10)
+
+      db.list(modelName, conf, callback)
 
     def 'get', "/#{modelName}/:id", (req, db, callback) ->
       db.getOne(modelName, { filter: { id: req.params.id } }, callback)
@@ -81,7 +95,16 @@ exports.build = (manikin, mods, getUserFromDbCore, config = {}) ->
 
     owners.forEach (owner) ->
       def 'get', "/#{owner.plur}/:id/#{modelName}", (req, db, callback) ->
-        db.list(modelName, { filter: _.object([[owner.sing, req.params.id]]) }, callback)
+        conf = {
+          filter: _.extend({}, getFilterObject(req.query), _.object([[owner.sing, req.params.id]]))
+          sort: getSortObject(req.query)
+        }
+        if req.query.limit?
+          conf.limit = parseInt(req.query.limit, 10)
+        if req.query.skip?
+          conf.skip = parseInt(req.query.skip, 10)
+
+        db.list(modelName, conf, callback)
 
       def 'post', "/#{owner.plur}/:id/#{modelName}", (req, db, callback) ->
         db.post(modelName, _.extend({}, req.body, _.object([[owner.sing, req.params.id]])), callback)
