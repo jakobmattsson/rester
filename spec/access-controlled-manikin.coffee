@@ -62,6 +62,27 @@ describe 'internal helper', ->
     it 'joins three objects, where a single one is missing the otherwise overlapping values', ->
       expect(acm.joinFilters({ a: 1, b: 2 }, { b: 2, c: 3 }, { d: 5 })).to.eql { a: 1, b: 2, c: 3, d: 5 }
 
+    it 'joins two different objects when one is an array', ->
+      expect(acm.joinFilters({ a: [5, 7], b: 2 }, { c: 3 })).to.eql { a: [5, 7], b: 2, c: 3 }
+
+    it 'joins two different objects when array meets excluded primitive', ->
+      expect(acm.joinFilters({ a: [5, 7], b: 2 }, { a: 8, c: 3 })).to.eql undefined
+
+    it 'joins two different objects when array meets included primitive', ->
+      expect(acm.joinFilters({ a: [5, 7], b: 2 }, { a: 7, c: 3 })).to.eql { a: 7, b: 2, c: 3 }
+
+    it 'joins two different objects when array meets partially overlapping array', ->
+      expect(acm.joinFilters({ a: [5, 7], b: 2 }, { a: [7, 8], c: 3 })).to.eql { a: 7, b: 2, c: 3 }
+
+    it 'joins two different objects when array meets non-overlapping array', ->
+      expect(acm.joinFilters({ a: [5, 7], b: 2 }, { a: [8, 9], c: 3 })).to.eql undefined
+
+    it 'joins two different objects when array meets partially overlapping array with array output', ->
+      expect(acm.joinFilters({ a: [5, 7, 9], b: 2 }, { a: [5, 7, 2], c: 3 })).to.eql { a: [5, 7], b: 2, c: 3 }
+
+    it 'joins two different objects when primitive meets array', ->
+      expect(acm.joinFilters({ a: 5, b: 2 }, { a: [5, 7, 2], c: 3 })).to.eql { a: 5, b: 2, c: 3 }
+
 
 
 describe 'the list-operation', ->

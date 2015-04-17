@@ -27,8 +27,18 @@ exports.joinFilters = joinFilters = (args...) ->
   cured.slice(1).reduce (memo, arg) ->
     return if !memo?
     dupKeys = _.intersection(Object.keys(memo), Object.keys(arg))
-    return if dupKeys.some (name) -> memo[name].toString() != arg[name].toString()
-    _.extend({}, memo, arg)
+
+    memoArray = _.mapObject memo, (val) -> if Array.isArray(val) then val else [val]
+    argArray = _.mapObject arg, (val) -> if Array.isArray(val) then val else [val]
+
+    dupPairs = dupKeys.map (name) -> [name, _.intersection(memoArray[name], argArray[name])]
+    return if dupPairs.some ([name, value]) -> value.length == 0
+    minimifiedDupPairs = dupPairs.map ([name, values]) ->
+      if values.length == 1 then [name, values[0]] else [name, values]
+
+    dupObject = _.object(minimifiedDupPairs)
+
+    _.extend({}, _(memo).omit(dupKeys), _(arg).omit(dupKeys), dupObject)
   , cured[0]
 
 
