@@ -42,27 +42,26 @@ exports.build = (manikin, mods, getUserFromDbCore, config = {}) ->
       req._cachedUser = result
       callback(null, result)
 
-  def = (method, route, callback) ->
-    returnedResult.push
-      method: method
-      route: route
-      callback: (req, cb) ->
-
-        # What else should there be in q request object?
-        req.params ?= {}
-
-        try
-          console.log(req.method, req.url) if config.verbose
-          getUserFromDb req, propagate cb, (usr) ->
-            callback(req, acm.build(manikin, mods, usr), cb)
-        catch ex
-          cb(new Error(ex.toString()))
-
-
   Object.keys(mods).forEach (modelName) ->
 
     owners = allMeta[modelName].owners
     manyToMany = allMeta[modelName].manyToMany
+
+    def = (method, route, callback) ->
+      returnedResult.push
+        method: method
+        route: route
+        callback: (req, cb) ->
+          # What else should there be in q request object?
+          req.params ?= {}
+          try
+            console.log(req.method, req.url) if config.verbose
+            getUserFromDb req, propagate cb, (usr) ->
+              callback req, acm.build(manikin, mods, usr), propagate cb, (data) ->
+                postProcess = mods[modelName].postProcess || ((x) -> x)
+                cb(null, postProcess(data))
+          catch ex
+            cb(new Error(ex.toString()))
 
     def 'get', "/#{modelName}", (req, db, callback) ->
       conf = {
